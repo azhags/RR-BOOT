@@ -1,0 +1,1818 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RR Boot - Automated Spot Crypto Trading Control Center</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js untuk Grafik Pertumbuhan Ekuitas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Tema Default Dark Glassmorphism */
+        body {
+            background-color: #070b14;
+            background-image:
+                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.10) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(20, 184, 166, 0.08) 0px, transparent 50%),
+                radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: #f8fafc;
+            transition: background-color 0.25s ease, color 0.25s ease;
+        }
+
+        /* Tema Light Glassmorphism saat mode terang aktif */
+        html:not(.dark) body {
+            background-color: #f1f5f9;
+            background-image:
+                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.12) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.10) 0px, transparent 50%),
+                radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
+            color: #0f172a;
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.72);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.35);
+        }
+
+        html:not(.dark) .glass-panel {
+            background: rgba(255, 255, 255, 0.78);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+        }
+
+        .glass-card {
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.52) 0%, rgba(15, 23, 42, 0.78) 100%);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            transition: all 0.25s ease;
+        }
+
+        html:not(.dark) .glass-card {
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 250, 252, 0.82) 100%);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .glass-card:hover {
+            border-color: rgba(16, 185, 129, 0.35);
+            transform: translateY(-2px);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.35); }
+        ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.55); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.8); }
+
+        @keyframes pulse-emerald {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        }
+        .status-dot-active { animation: pulse-emerald 2s infinite; }
+
+        @keyframes pulse-amber {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+            50% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+        }
+        .status-dot-sim { animation: pulse-amber 2s infinite; }
+    </style>
+</head>
+<body class="antialiased selection:bg-emerald-500/30 selection:text-emerald-200 pb-20 md:pb-0">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- Custom Confirmation Modal (Tanpa alert/confirm bawaan browser) -->
+    <div id="confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+        <div class="glass-panel rounded-2xl max-w-md w-full p-6 border border-rose-500/30 shadow-2xl">
+            <div class="flex items-center gap-3 text-rose-400 mb-3">
+                <div class="w-10 h-10 rounded-full bg-rose-500/20 flex items-center justify-center">
+                    <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                </div>
+                <h3 id="confirm-title" class="text-lg font-bold text-white dark:text-white text-slate-900">Konfirmasi Tindakan</h3>
+            </div>
+            <p id="confirm-message" class="text-slate-300 dark:text-slate-300 text-slate-700 text-sm mb-6 leading-relaxed">Apakah Anda yakin ingin melanjutkan?</p>
+            <div class="flex justify-end gap-3">
+                <button type="button" onclick="closeConfirmModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium transition">Batal</button>
+                <button type="button" id="confirm-yes-btn" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold shadow-lg shadow-rose-600/30 transition">Ya, Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Tambah / Edit Strategi Spot Grid DCA TP -->
+    <div id="strategy-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
+        <div class="glass-panel rounded-2xl max-w-lg w-full p-6 border border-emerald-500/25 shadow-2xl my-8">
+            <div class="flex justify-between items-center pb-4 border-b border-slate-800 dark:border-slate-800 border-slate-200">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                        <i data-lucide="layers" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 id="strategy-modal-title" class="text-lg font-bold text-white dark:text-white text-slate-900">Tambah Strategi Spot Grid DCA TP</h3>
+                        <p class="text-[11px] text-emerald-400 font-mono">SPOT ONLY • NO LEVERAGE / NO SHORT</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeStrategyModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800/70 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="strategy-form" onsubmit="saveStrategy(event)" class="mt-4 space-y-4">
+                <input type="hidden" id="strat-edit-id" value="">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 dark:text-slate-400 text-slate-700 mb-1.5">Nama Strategi Spot</label>
+                        <input type="text" id="strat-name" required placeholder="Contoh: BTC Spot DCA Accumulator" class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-white dark:text-white text-slate-900 focus:outline-none focus:border-emerald-500">
+                    </div>
+
+                    <!-- Tipe Strategi Dikunci / Difokuskan pada Grid DCA TP -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 dark:text-slate-400 text-slate-700 mb-1.5">Tipe Strategi (Terkunci)</label>
+                        <div class="relative">
+                            <input type="text" id="strat-type" value="Grid DCA TP" readonly class="w-full bg-emerald-500/10 border border-emerald-500/30 rounded-xl pl-3.5 pr-9 py-2.5 text-sm font-semibold text-emerald-400 font-mono cursor-not-allowed focus:outline-none">
+                            <i data-lucide="lock" class="w-4 h-4 text-emerald-400 absolute right-3 top-1/2 -translate-y-1/2"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 dark:text-slate-400 text-slate-700 mb-1.5">Trading Pair (Spot)</label>
+                        <select id="strat-pair" class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-white dark:text-white text-slate-900 font-mono focus:outline-none focus:border-emerald-500">
+                            <option value="BTC/USDT">BTC/USDT</option>
+                            <option value="ETH/USDT">ETH/USDT</option>
+                            <option value="SOL/USDT">SOL/USDT</option>
+                            <option value="BNB/USDT">BNB/USDT</option>
+                            <option value="XRP/USDT">XRP/USDT</option>
+                            <option value="SUI/USDT">SUI/USDT</option>
+                            <option value="LINK/USDT">LINK/USDT</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 dark:text-slate-400 text-slate-700 mb-1.5">Modal Alokasi Spot (USDT)</label>
+                        <input type="number" id="strat-capital" required min="10" step="10" value="300" class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl px-3.5 py-2.5 text-sm text-white dark:text-white text-slate-900 font-mono focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <!-- Parameter Grid DCA TP: Max Layers, DCA Multiplier, Step Drop %, Take Profit % -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 dark:text-slate-400 text-slate-700 mb-1.5">Max Layers</label>
+                        <input type="number" id="strat-max-layers" required min="1" max="15" step="1" value="4" class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl px-3 py-2 text-sm text-cyan-400 font-mono focus:outline-none focus:border-emerald-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 dark:text-slate-400 text-slate-700 mb-1.5">DCA Multiplier</label>
+                        <input type="number" id="strat-multiplier" required min="1.0" max="5.0" step="0.1" value="1.5" class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl px-3 py-2 text-sm text-amber-400 font-mono focus:outline-none focus:border-emerald-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 dark:text-slate-400 text-slate-700 mb-1.5">Step Drop %</label>
+                        <input type="number" id="strat-sl" required min="0.2" max="50" step="0.1" value="1.2" class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl px-3 py-2 text-sm text-rose-400 font-mono focus:outline-none focus:border-emerald-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 dark:text-slate-400 text-slate-700 mb-1.5">Take Profit %</label>
+                        <input type="number" id="strat-tp" required min="0.2" max="500" step="0.1" value="1.5" class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl px-3 py-2 text-sm text-emerald-400 font-mono focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <!-- Preview Perhitungan Modal per Layer -->
+                <div id="dca-allocation-preview" class="p-3 rounded-xl bg-slate-900/75 dark:bg-slate-900/75 bg-slate-100 border border-slate-800 dark:border-slate-800 border-slate-200 text-xs font-mono text-slate-300 dark:text-slate-300 text-slate-700 flex flex-wrap items-center justify-between gap-2">
+                    <span>Estimasi Base Order (L0): <strong id="preview-base-order" class="text-emerald-400">$22.15</strong></span>
+                    <span>Total Bobot: <strong id="preview-weight-sum" class="text-cyan-400">13.56x</strong></span>
+                </div>
+
+                <div class="pt-3 flex justify-end gap-3 border-t border-slate-800 dark:border-slate-800 border-slate-200">
+                    <button type="button" onclick="closeStrategyModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium transition">Batal</button>
+                    <button type="submit" id="strategy-submit-btn" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-lg shadow-emerald-600/25 transition flex items-center gap-2">
+                        <i data-lucide="check" class="w-4 h-4"></i> Simpan Strategi Spot
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Layout Wrapper -->
+    <div class="flex min-h-screen">
+
+        <!-- Sidebar Navigasi (Desktop) -->
+        <aside class="hidden md:flex flex-col w-64 glass-panel border-r border-slate-800/80 dark:border-slate-800/80 border-slate-200 fixed inset-y-0 left-0 z-30">
+            <!-- Brand Logo RR Boot -->
+            <div class="p-6 flex items-center gap-3 border-b border-slate-800/80 dark:border-slate-800/80 border-slate-200">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                    <i data-lucide="layers" class="w-5 h-5 text-slate-950"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight text-white dark:text-white text-slate-900">RR <span class="text-emerald-400">Boot</span></h1>
+                    <p class="text-[10px] text-slate-400 leading-tight">Spot Grid DCA TP Control Center</p>
+                </div>
+            </div>
+
+            <!-- Menu Navigasi -->
+            <nav class="flex-1 p-4 space-y-1.5 overflow-y-auto">
+                <button type="button" onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 transition">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    <span>Dashboard Utama</span>
+                </button>
+                <button type="button" onclick="switchTab('strategies')" id="nav-strategies" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white dark:hover:text-white hover:text-slate-900 hover:bg-slate-800/60 dark:hover:bg-slate-800/60 hover:bg-slate-200/70 transition">
+                    <i data-lucide="grid" class="w-4 h-4"></i>
+                    <span>Grid DCA Strategi</span>
+                    <span id="sidebar-bot-count" class="ml-auto text-xs bg-slate-800/90 text-emerald-400 px-2 py-0.5 rounded-full font-mono">3/3</span>
+                </button>
+                <button type="button" onclick="switchTab('history')" id="nav-history" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white dark:hover:text-white hover:text-slate-900 hover:bg-slate-800/60 dark:hover:bg-slate-800/60 hover:bg-slate-200/70 transition">
+                    <i data-lucide="history" class="w-4 h-4"></i>
+                    <span>Riwayat Profit</span>
+                </button>
+                <button type="button" onclick="switchTab('api')" id="nav-api" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:text-white dark:hover:text-white hover:text-slate-900 hover:bg-slate-800/60 dark:hover:bg-slate-800/60 hover:bg-slate-200/70 transition">
+                    <i data-lucide="server" class="w-4 h-4"></i>
+                    <span>VPS & Spot API</span>
+                    <span id="sidebar-vps-dot" class="ml-auto w-2 h-2 rounded-full bg-amber-400"></span>
+                </button>
+            </nav>
+
+            <!-- Server & Spot Mode Box -->
+            <div class="p-4 m-4 rounded-xl bg-slate-900/80 dark:bg-slate-900/80 bg-white/80 border border-slate-800/90 dark:border-slate-800/90 border-slate-200 space-y-2">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-400">Market Scope</span>
+                    <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-mono font-bold text-[10px]">SPOT ONLY</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-400">Engine Mode</span>
+                    <span id="sidebar-mode-text" class="text-amber-400 font-mono font-semibold">SIMULATION</span>
+                </div>
+                <div class="flex items-center justify-between text-[11px] text-slate-500">
+                    <span>Strategy</span>
+                    <span class="font-mono text-emerald-400 font-medium">Grid DCA TP</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 md:ml-64 flex flex-col min-w-0">
+
+            <!-- Top Header Bar -->
+            <header class="sticky top-0 z-20 glass-panel border-b border-slate-800/80 dark:border-slate-800/80 border-slate-200 px-4 lg:px-8 py-3.5">
+                <div class="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
+
+                    <!-- Left: Mobile Logo, SPOT ONLY Badge, Mode Badge & Exchange Selector -->
+                    <div class="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+                        <div class="md:hidden flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center">
+                                <i data-lucide="layers" class="w-4 h-4 text-slate-950"></i>
+                            </div>
+                            <span class="font-bold text-sm">RR <span class="text-emerald-400">Boot</span></span>
+                        </div>
+
+                        <!-- Badge SPOT ONLY -->
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-mono font-bold tracking-wide">
+                            <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+                            SPOT ONLY
+                        </span>
+
+                        <!-- Status Koneksi VPS / Simulation Badge -->
+                        <button type="button" onclick="switchTab('api')" id="vps-status-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold hover:bg-amber-500/25 transition">
+                            <span id="vps-status-dot" class="w-2 h-2 rounded-full bg-amber-400 status-dot-sim"></span>
+                            <span id="vps-status-text">SIMULATION MODE</span>
+                        </button>
+
+                        <!-- Pemilih Exchange Khusus Spot -->
+                        <div class="relative">
+                            <select id="header-exchange-select" onchange="changeActiveExchange()" class="appearance-none bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700/80 dark:border-slate-700/80 border-slate-300 hover:border-emerald-500/60 text-xs sm:text-sm font-medium rounded-xl pl-3 pr-8 py-1.5 focus:outline-none focus:border-emerald-500 cursor-pointer">
+                                <option value="Binance Spot">Binance Spot</option>
+                                <option value="Bybit Spot">Bybit Spot</option>
+                                <option value="OKX Spot">OKX Spot</option>
+                            </select>
+                            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                        </div>
+                    </div>
+
+                    <!-- Right: Theme Toggle, Clock, Master Controls, Panic Sell -->
+                    <div class="flex items-center gap-2 ml-auto">
+                        <!-- Light/Dark Theme Toggle -->
+                        <button type="button" onclick="toggleTheme()" id="theme-toggle-btn" title="Ganti Tema Terang / Gelap" class="p-2 rounded-xl bg-slate-800/80 dark:bg-slate-800/80 bg-slate-200/80 hover:bg-slate-700 dark:hover:bg-slate-700 hover:bg-slate-300 border border-slate-700/60 dark:border-slate-700/60 border-slate-300 text-amber-400 dark:text-amber-400 text-slate-700 transition">
+                            <i id="theme-icon" data-lucide="sun" class="w-4 h-4"></i>
+                        </button>
+
+                        <!-- Real-time Clock WIB -->
+                        <div class="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/70 dark:bg-slate-900/70 bg-white/80 border border-slate-800 dark:border-slate-800 border-slate-200 text-xs font-mono text-slate-300 dark:text-slate-300 text-slate-700">
+                            <i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-400"></i>
+                            <span id="realtime-clock">00:00:00 WIB</span>
+                        </div>
+
+                        <!-- Master Bot Status -->
+                        <div id="master-status-badge" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+                            <span id="master-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 status-dot-active"></span>
+                            <span id="master-status-text">RUNNING</span>
+                        </div>
+
+                        <!-- Tombol Master Start / Pause -->
+                        <button type="button" id="master-toggle-btn" onclick="toggleMasterBot()" class="px-3 py-1.5 sm:py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-semibold transition flex items-center gap-1.5">
+                            <i id="master-toggle-icon" data-lucide="pause" class="w-3.5 h-3.5"></i>
+                            <span id="master-toggle-text">Pause All</span>
+                        </button>
+
+                        <!-- Emergency Panic Sell Spot -->
+                        <button type="button" onclick="triggerPanicSell()" title="Jual seluruh aset Spot ke USDT & hentikan semua bot" class="px-3 py-1.5 sm:py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-lg shadow-rose-600/25 transition flex items-center gap-1.5">
+                            <i data-lucide="octagon-alert" class="w-3.5 h-3.5"></i>
+                            <span>Panic Sell</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Workspace Container -->
+            <main class="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
+
+                <!-- ==================== TAB 1: DASHBOARD UTAMA ==================== -->
+                <div id="tab-dashboard" class="tab-content space-y-6">
+
+                    <!-- KPI Cards Grid (4 Kolom Responsif) -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                        <!-- Card 1: Total Saldo Spot -->
+                        <div class="glass-card rounded-2xl p-5">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Saldo Spot (USDT)</p>
+                                        <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">SPOT</span>
+                                    </div>
+                                    <h2 id="kpi-balance-usdt" class="text-2xl sm:text-3xl font-bold font-mono mt-1.5">$12,450.00</h2>
+                                    <p id="kpi-balance-idr" class="text-xs text-slate-400 font-mono mt-1">≈ Rp 202.312.500</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                                    <i data-lucide="wallet" class="w-5 h-5"></i>
+                                </div>
+                            </div>
+                            <div class="mt-4 pt-3 border-t border-slate-800/60 dark:border-slate-800/60 border-slate-200/80 flex items-center justify-between text-xs">
+                                <span class="text-slate-400">Free USDT</span>
+                                <span id="kpi-free-margin" class="text-emerald-400 font-mono font-medium">$10,650.00</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Total Profit / PnL Grid DCA TP -->
+                        <div class="glass-card rounded-2xl p-5">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Realized Profit (TP)</p>
+                                    <h2 id="kpi-total-profit" class="text-2xl sm:text-3xl font-bold text-emerald-400 font-mono mt-1.5">+$1,845.60</h2>
+                                    <p id="kpi-roi-pct" class="text-xs text-emerald-400/80 font-mono mt-1 flex items-center gap-1">
+                                        <i data-lucide="trending-up" class="w-3.5 h-3.5"></i> +17.40% Spot ROI
+                                    </p>
+                                </div>
+                                <div class="w-10 h-10 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center border border-teal-500/20">
+                                    <i data-lucide="badge-dollar-sign" class="w-5 h-5"></i>
+                                </div>
+                            </div>
+                            <div class="mt-4 pt-3 border-t border-slate-800/60 dark:border-slate-800/60 border-slate-200/80 flex items-center justify-between text-xs">
+                                <span class="text-slate-400">Sumber Data</span>
+                                <span id="kpi-data-source" class="font-mono">Local Spot Sim</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Win Rate Siklus TP -->
+                        <div class="glass-card rounded-2xl p-5">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Siklus TP Berhasil</p>
+                                    <h2 id="kpi-winrate" class="text-2xl sm:text-3xl font-bold font-mono mt-1.5">94.2%</h2>
+                                    <p id="kpi-trade-counts" class="text-xs text-slate-400 font-mono mt-1">164 TP / 174 Siklus</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center border border-cyan-500/20">
+                                    <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                                </div>
+                            </div>
+                            <div class="mt-4 pt-3 border-t border-slate-800/60 dark:border-slate-800/60 border-slate-200/80 flex items-center justify-between text-xs">
+                                <span class="text-slate-400">Strategi</span>
+                                <span class="text-cyan-400 font-mono font-semibold">Grid DCA TP</span>
+                            </div>
+                        </div>
+
+                        <!-- Card 4: Strategi Spot Aktif -->
+                        <div class="glass-card rounded-2xl p-5">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Grid DCA Bot Aktif</p>
+                                    <h2 id="kpi-active-bots" class="text-2xl sm:text-3xl font-bold font-mono mt-1.5">3 <span class="text-base font-normal text-slate-400">/ 3 Bot</span></h2>
+                                    <p id="kpi-allocated-cap" class="text-xs text-amber-400 font-mono mt-1">Modal Spot: $1,800 USDT</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center border border-amber-500/20">
+                                    <i data-lucide="layers" class="w-5 h-5"></i>
+                                </div>
+                            </div>
+                            <div class="mt-4 pt-3 border-t border-slate-800/60 dark:border-slate-800/60 border-slate-200/80 flex items-center justify-between text-xs">
+                                <span class="text-slate-400">Spot BTC/USDT</span>
+                                <span id="live-btc-ticker" class="font-mono font-semibold">$94,280.50</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grafik Ekuitas & Live Terminal Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                        <!-- Grafik Pertumbuhan Ekuitas Interaktif (Chart.js) -->
+                        <div class="lg:col-span-2 glass-panel rounded-2xl p-5 flex flex-col">
+                            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                                <div>
+                                    <h3 class="text-base font-bold flex items-center gap-2">
+                                        <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i>
+                                        Pertumbuhan Ekuitas Spot (Grid DCA TP)
+                                    </h3>
+                                    <p class="text-xs text-slate-400">Akumulasi saldo & profit bersih market Spot tanpa leverage</p>
+                                </div>
+
+                                <!-- Timeframe Filter -->
+                                <div class="flex bg-slate-900/90 dark:bg-slate-900/90 bg-slate-200/80 p-1 rounded-xl border border-slate-800 dark:border-slate-800 border-slate-300">
+                                    <button type="button" onclick="updateChartTimeframe('24H')" id="tf-24H" class="tf-btn px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-emerald-400 transition">24J</button>
+                                    <button type="button" onclick="updateChartTimeframe('7D')" id="tf-7D" class="tf-btn px-3 py-1 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition">7H</button>
+                                    <button type="button" onclick="updateChartTimeframe('30D')" id="tf-30D" class="tf-btn px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-emerald-400 transition">30H</button>
+                                    <button type="button" onclick="updateChartTimeframe('ALL')" id="tf-ALL" class="tf-btn px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-emerald-400 transition">ALL</button>
+                                </div>
+                            </div>
+
+                            <div class="relative flex-1 min-h-[270px] w-full">
+                                <canvas id="profitChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Live Bot Terminal (Real-time Log Viewer) -->
+                        <div class="glass-panel rounded-2xl p-5 flex flex-col h-[370px] lg:h-auto">
+                            <div class="flex items-center justify-between pb-3 border-b border-slate-800 dark:border-slate-800 border-slate-200">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 status-dot-active"></span>
+                                    <h3 class="text-sm font-bold font-mono">RR BOOT SPOT TERMINAL</h3>
+                                </div>
+                                <button type="button" onclick="clearTerminalLogs()" class="text-xs text-slate-400 hover:text-emerald-400 transition flex items-center gap-1">
+                                    <i data-lucide="eraser" class="w-3.5 h-3.5"></i> Clear
+                                </button>
+                            </div>
+
+                            <div id="bot-terminal" class="flex-1 overflow-y-auto font-mono text-xs space-y-2 py-3 pr-1 text-slate-300 dark:text-slate-300 text-slate-700">
+                                <!-- Logs injected via JS -->
+                            </div>
+
+                            <div class="pt-3 border-t border-slate-800 dark:border-slate-800 border-slate-200 flex items-center justify-between gap-2">
+                                <span id="terminal-source-label" class="text-[11px] text-slate-500 font-mono">Mode: Simulasi Spot Lokal</span>
+                                <button type="button" onclick="forceRefreshOrSimulate()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-emerald-400 transition flex items-center gap-1.5">
+                                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span id="terminal-action-text">Simulasi DCA/TP</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ringkasan Strategi Grid DCA TP Aktif -->
+                    <div class="glass-panel rounded-2xl p-5">
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                            <div>
+                                <h3 class="text-base font-bold">Strategi Spot Grid DCA TP Terpasang</h3>
+                                <p class="text-xs text-slate-400">Pantau Max Layers, DCA Multiplier, Step Drop %, dan Take Profit % setiap bot</p>
+                            </div>
+                            <button type="button" onclick="openStrategyModal()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-emerald-600/20 transition flex items-center gap-2">
+                                <i data-lucide="plus" class="w-4 h-4"></i> Tambah Strategi
+                            </button>
+                        </div>
+
+                        <div id="dashboard-strategies-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            <!-- Cards rendered via JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== TAB 2: MANAJEMEN STRATEGI GRID DCA TP ==================== -->
+                <div id="tab-strategies" class="tab-content hidden space-y-6">
+                    <div class="flex flex-wrap items-center justify-between gap-4 glass-panel p-5 rounded-2xl">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h2 class="text-xl font-bold">Manajemen Strategi Spot Grid DCA TP</h2>
+                                <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-mono text-xs font-bold">SPOT ONLY</span>
+                            </div>
+                            <p class="text-xs sm:text-sm text-slate-400 mt-0.5">Atur Pair Spot, Modal USDT, Max Layers, DCA Multiplier, Step Drop %, dan Take Profit %.</p>
+                        </div>
+                        <button type="button" onclick="openStrategyModal()" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-lg shadow-emerald-600/25 transition flex items-center gap-2">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Buat Strategi Grid DCA
+                        </button>
+                    </div>
+
+                    <div class="glass-panel rounded-2xl overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-800 dark:border-slate-800 border-slate-200 text-[11px] uppercase text-slate-400 font-semibold bg-slate-900/50 dark:bg-slate-900/50 bg-slate-100/80">
+                                        <th class="py-3.5 px-4">Nama Strategi</th>
+                                        <th class="py-3.5 px-4">Pair Spot</th>
+                                        <th class="py-3.5 px-4">Modal (USDT)</th>
+                                        <th class="py-3.5 px-4">Max Layers</th>
+                                        <th class="py-3.5 px-4">DCA Mult.</th>
+                                        <th class="py-3.5 px-4">Step Drop / TP</th>
+                                        <th class="py-3.5 px-4 text-center">Aktif</th>
+                                        <th class="py-3.5 px-4 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="strategies-table-body" class="divide-y divide-slate-800/60 dark:divide-slate-800/60 divide-slate-200 text-xs sm:text-sm font-mono">
+                                    <!-- Rendered via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== TAB 3: RIWAYAT PROFIT & EKSEKUSI ==================== -->
+                <div id="tab-history" class="tab-content hidden space-y-6">
+                    <div class="glass-panel p-5 rounded-2xl space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <h2 class="text-xl font-bold">Riwayat Profit & Eksekusi Spot</h2>
+                                <p class="text-xs sm:text-sm text-slate-400">Log order BUY L0, DCA layer, dan TP SOLD yang dieksekusi oleh RR Boot.</p>
+                            </div>
+                            <button type="button" onclick="exportHistoryCSV()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs sm:text-sm font-medium text-slate-200 transition flex items-center gap-2">
+                                <i data-lucide="download" class="w-4 h-4 text-emerald-400"></i> Download CSV
+                            </button>
+                        </div>
+
+                        <!-- Filter & Search Bar -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                            <div class="relative">
+                                <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                                <input type="text" id="history-search" onkeyup="renderHistoryTable()" placeholder="Cari Pair Spot (misal: BTC, ETH, SOL)..." class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl pl-10 pr-4 py-2 text-xs sm:text-sm text-white dark:text-white text-slate-900 focus:outline-none focus:border-emerald-500">
+                            </div>
+                            <div>
+                                <select id="history-filter-result" onchange="renderHistoryTable()" class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-white dark:text-white text-slate-900 focus:outline-none focus:border-emerald-500">
+                                    <option value="ALL">Semua Transaksi (BUY / DCA / TP SOLD)</option>
+                                    <option value="PROFIT">Hanya Realized Profit (+)</option>
+                                    <option value="LOSS">Hanya Realized Loss (-)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- History Table -->
+                        <div class="overflow-x-auto pt-2">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-slate-800 dark:border-slate-800 border-slate-200 text-[11px] uppercase text-slate-400 font-semibold bg-slate-900/50 dark:bg-slate-900/50 bg-slate-100/80">
+                                        <th class="py-3.5 px-4 rounded-tl-xl">Waktu</th>
+                                        <th class="py-3.5 px-4">Exchange Spot</th>
+                                        <th class="py-3.5 px-4">Pair</th>
+                                        <th class="py-3.5 px-4">Side / Layer</th>
+                                        <th class="py-3.5 px-4">Strategi</th>
+                                        <th class="py-3.5 px-4">Harga Entry</th>
+                                        <th class="py-3.5 px-4">Realized PnL</th>
+                                        <th class="py-3.5 px-4 text-right rounded-tr-xl">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="full-history-tbody" class="divide-y divide-slate-800/60 dark:divide-slate-800/60 divide-slate-200 text-xs font-mono">
+                                    <!-- Rendered via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== TAB 4: KONEKSI VPS & SPOT API KEY ==================== -->
+                <div id="tab-api" class="tab-content hidden space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                        <!-- BAGIAN A: Koneksi Server VPS Bridge -->
+                        <div class="glass-panel rounded-2xl p-6 space-y-5 border border-emerald-500/20">
+                            <div class="flex items-center justify-between border-b border-slate-800 dark:border-slate-800 border-slate-200 pb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                                        <i data-lucide="server" class="w-5 h-5"></i>
+                                    </div>
+                                    <div>
+                                        <h2 class="text-lg font-bold">Bagian A: Koneksi Server VPS Bridge</h2>
+                                        <p class="text-xs text-slate-400">Hubungkan RR Boot ke Back-End Node.js Spot di VPS Anda.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1.5">URL Server VPS / Cloudflare Tunnel</label>
+                                    <input type="url" id="vps-url-input" placeholder="https://nama-tunnel.trycloudflare.com atau http://IP_VPS:3000" class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-mono text-white dark:text-white text-slate-900 focus:outline-none focus:border-emerald-500">
+                                    <p class="text-[11px] text-slate-500 mt-1">Gunakan URL HTTPS (Cloudflare Tunnel) jika dashboard dibuka dari GitHub Pages.</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1.5">Dashboard Security PIN (<code class="text-emerald-400">x-dashboard-pin</code>)</label>
+                                    <div class="relative">
+                                        <input type="password" id="vps-pin-input" value="123456" placeholder="Masukkan PIN sesuai .env VPS..." class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl pl-3.5 pr-10 py-2.5 text-sm font-mono text-white dark:text-white text-slate-900 focus:outline-none focus:border-emerald-500">
+                                        <button type="button" onclick="toggleInputVisibility('vps-pin-input')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-400">
+                                            <i data-lucide="eye" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="p-3.5 rounded-xl bg-slate-900/80 dark:bg-slate-900/80 bg-slate-100 border border-slate-800 dark:border-slate-800 border-slate-200 flex items-center justify-between gap-2">
+                                    <span class="text-xs text-slate-400">Status Koneksi Saat Ini:</span>
+                                    <span id="vps-panel-status" class="text-xs font-mono font-bold text-amber-400 truncate">SIMULATION MODE (Lokal)</span>
+                                </div>
+
+                                <div class="pt-2 flex flex-wrap gap-3">
+                                    <button type="button" id="btn-connect-vps" onclick="connectToVPS()" class="flex-1 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
+                                        <i data-lucide="plug" class="w-4 h-4"></i> Hubungkan ke VPS
+                                    </button>
+                                    <button type="button" onclick="disconnectVPS()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm font-medium transition">
+                                        Mode Simulasi
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BAGIAN B: Konfigurasi Spot Exchange API Key -->
+                        <div class="glass-panel rounded-2xl p-6 space-y-5">
+                            <div class="flex items-center justify-between border-b border-slate-800 dark:border-slate-800 border-slate-200 pb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                                        <i data-lucide="key-round" class="w-5 h-5"></i>
+                                    </div>
+                                    <div>
+                                        <h2 class="text-lg font-bold">Bagian B: Spot Exchange API Key</h2>
+                                        <p class="text-xs text-slate-400">Kredensial khusus izin <span class="text-emerald-400 font-semibold">Spot Trading</span> saja.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <form id="api-config-form" onsubmit="saveAndTestApiKey(event)" class="space-y-4">
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-1.5">Exchange</label>
+                                        <select id="api-exchange" class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl px-3 py-2 text-sm text-white dark:text-white text-slate-900 focus:outline-none focus:border-emerald-500">
+                                            <option value="binance">Binance</option>
+                                            <option value="bybit">Bybit</option>
+                                            <option value="okx">OKX</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Market Type Dikunci ke SPOT ONLY -->
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-1.5">Market Type</label>
+                                        <div class="relative">
+                                            <input type="text" id="api-market-type" value="spot" readonly class="w-full bg-emerald-500/10 border border-emerald-500/30 rounded-xl pl-3 pr-8 py-2 text-sm font-mono font-bold text-emerald-400 uppercase cursor-not-allowed focus:outline-none">
+                                            <i data-lucide="lock" class="w-3.5 h-3.5 text-emerald-400 absolute right-2.5 top-1/2 -translate-y-1/2"></i>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-400 mb-1.5">Mode Jaringan</label>
+                                        <select id="api-is-testnet" class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl px-3 py-2 text-sm text-white dark:text-white text-slate-900 focus:outline-none focus:border-emerald-500">
+                                            <option value="true">Testnet (Demo Spot)</option>
+                                            <option value="false">Mainnet (Real Spot)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1.5">Spot API Key</label>
+                                    <input type="text" id="api-key-input" required placeholder="Masukkan Spot API Key..." class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-mono text-white dark:text-white text-slate-900 focus:outline-none focus:border-emerald-500">
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1.5">Spot Secret Key</label>
+                                    <div class="relative">
+                                        <input type="password" id="api-secret-input" required placeholder="Masukkan Spot Secret Key..." class="w-full bg-slate-900/90 dark:bg-slate-900/90 bg-white border border-slate-700 dark:border-slate-700 border-slate-300 rounded-xl pl-3.5 pr-10 py-2.5 text-sm font-mono text-white dark:text-white text-slate-900 focus:outline-none focus:border-emerald-500">
+                                        <button type="button" onclick="toggleInputVisibility('api-secret-input')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-400">
+                                            <i data-lucide="eye" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="pt-2">
+                                    <button type="submit" id="btn-save-api" class="w-full px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2">
+                                        <i data-lucide="shield-check" class="w-4 h-4"></i> Simpan & Tes Koneksi Spot API
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="md:hidden fixed bottom-0 inset-x-0 z-30 glass-panel border-t border-slate-800/80 dark:border-slate-800/80 border-slate-200 flex justify-around items-center py-2 px-1">
+        <button type="button" onclick="switchTab('dashboard')" id="mob-nav-dashboard" class="mob-nav-btn flex flex-col items-center gap-1 p-2 text-emerald-400">
+            <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+            <span class="text-[10px] font-medium">Dashboard</span>
+        </button>
+        <button type="button" onclick="switchTab('strategies')" id="mob-nav-strategies" class="mob-nav-btn flex flex-col items-center gap-1 p-2 text-slate-400">
+            <i data-lucide="grid" class="w-4 h-4"></i>
+            <span class="text-[10px] font-medium">Grid DCA</span>
+        </button>
+        <button type="button" onclick="switchTab('history')" id="mob-nav-history" class="mob-nav-btn flex flex-col items-center gap-1 p-2 text-slate-400">
+            <i data-lucide="history" class="w-4 h-4"></i>
+            <span class="text-[10px] font-medium">Riwayat</span>
+        </button>
+        <button type="button" onclick="switchTab('api')" id="mob-nav-api" class="mob-nav-btn flex flex-col items-center gap-1 p-2 text-slate-400">
+            <i data-lucide="server" class="w-4 h-4"></i>
+            <span class="text-[10px] font-medium">VPS & API</span>
+        </button>
+    </nav>
+
+    <!-- ==================== JAVASCRIPT ENGINE: SPOT GRID DCA TP & VPS BRIDGE ==================== -->
+    <script>
+        // --- 1. DEFAULT SPOT SIMULATION STATE ---
+        const DEFAULT_SPOT_STATE = {
+            masterRunning: true,
+            activeExchange: 'Binance Spot',
+            balanceUSDT: 12450.00,
+            freeBalanceUSDT: 10650.00,
+            totalProfit: 1845.60,
+            wins: 164,
+            totalTrades: 174,
+            btcPrice: 94280.50,
+            strategies: [
+                {
+                    id: 1,
+                    name: 'BTC Spot Grid DCA',
+                    pair: 'BTC/USDT',
+                    strategy_type: 'Grid DCA TP',
+                    capital: 800,
+                    max_layers: 4,
+                    dca_multiplier: 1.5,
+                    sl_percent: 1.2,
+                    tp_percent: 1.5,
+                    current_layer: 1,
+                    avg_entry: 94520.00,
+                    is_active: 1
+                },
+                {
+                    id: 2,
+                    name: 'ETH Spot Accumulator',
+                    pair: 'ETH/USDT',
+                    strategy_type: 'Grid DCA TP',
+                    capital: 600,
+                    max_layers: 4,
+                    dca_multiplier: 1.4,
+                    sl_percent: 1.0,
+                    tp_percent: 1.8,
+                    current_layer: 0,
+                    avg_entry: 0,
+                    is_active: 1
+                },
+                {
+                    id: 3,
+                    name: 'SOL Spot DCA Ladder',
+                    pair: 'SOL/USDT',
+                    strategy_type: 'Grid DCA TP',
+                    capital: 400,
+                    max_layers: 3,
+                    dca_multiplier: 1.5,
+                    sl_percent: 1.5,
+                    tp_percent: 2.0,
+                    current_layer: 2,
+                    avg_entry: 238.40,
+                    is_active: 1
+                }
+            ],
+            history: [
+                { id: 201, created_at: '20 Nov 22:10:08', exchange: 'Binance Spot', pair: 'BTC/USDT', side: 'SELL TP', strategy_name: 'BTC Spot Grid DCA', entry_price: 93640.00, pnl_usdt: 28.40, status: 'TP_SOLD' },
+                { id: 202, created_at: '20 Nov 21:34:22', exchange: 'Binance Spot', pair: 'SOL/USDT', side: 'BUY L2', strategy_name: 'SOL Spot DCA Ladder', entry_price: 236.10, pnl_usdt: 0, status: 'OPEN' },
+                { id: 203, created_at: '20 Nov 20:18:55', exchange: 'Binance Spot', pair: 'ETH/USDT', side: 'SELL TP', strategy_name: 'ETH Spot Accumulator', entry_price: 3095.00, pnl_usdt: 19.75, status: 'TP_SOLD' },
+                { id: 204, created_at: '20 Nov 19:02:11', exchange: 'Binance Spot', pair: 'BTC/USDT', side: 'BUY L0', strategy_name: 'BTC Spot Grid DCA', entry_price: 94100.00, pnl_usdt: 0, status: 'OPEN' }
+            ]
+        };
+
+        let vpsConfig = JSON.parse(localStorage.getItem('rrBootSpotVpsConfig')) || {
+            connected: false,
+            url: '',
+            pin: '123456'
+        };
+
+        let appState = JSON.parse(localStorage.getItem('rrBootSpotAppState')) || JSON.parse(JSON.stringify(DEFAULT_SPOT_STATE));
+        let profitChartInstance = null;
+        let currentTimeframe = '7D';
+
+        function saveLocalState() {
+            localStorage.setItem('rrBootSpotAppState', JSON.stringify(appState));
+        }
+
+        function saveVpsConfig() {
+            localStorage.setItem('rrBootSpotVpsConfig', JSON.stringify(vpsConfig));
+        }
+
+        // --- 2. THEME TOGGLE (LIGHT / DARK) ---
+        function initTheme() {
+            const savedTheme = localStorage.getItem('rrBootTheme') || 'dark';
+            applyTheme(savedTheme);
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.contains('dark');
+            applyTheme(isDark ? 'light' : 'dark');
+        }
+
+        function applyTheme(theme) {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (theme === 'dark') {
+                html.classList.add('dark');
+                if (icon) icon.setAttribute('data-lucide', 'sun');
+            } else {
+                html.classList.remove('dark');
+                if (icon) icon.setAttribute('data-lucide', 'moon');
+            }
+            localStorage.setItem('rrBootTheme', theme);
+            updateChartThemeColors();
+            lucide.createIcons();
+        }
+
+        // --- 3. INITIALIZATION ---
+        window.onload = function() {
+            initTheme();
+            lucide.createIcons();
+            updateClock();
+            setInterval(updateClock, 1000);
+
+            // Bind preview kalkulasi DCA pada form modal
+            ['strat-capital', 'strat-max-layers', 'strat-multiplier'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('input', updateDcaAllocationPreview);
+            });
+            updateDcaAllocationPreview();
+
+            document.getElementById('vps-url-input').value = vpsConfig.url || '';
+            document.getElementById('vps-pin-input').value = vpsConfig.pin || '123456';
+            document.getElementById('header-exchange-select').value = appState.activeExchange;
+
+            initChart();
+            updateConnectionModeUI();
+
+            if (vpsConfig.connected && vpsConfig.url) {
+                appendTerminalLog(`Menghubungkan ke VPS Spot Engine (${vpsConfig.url})...`, 'info');
+                syncDataFromVPS(true);
+            } else {
+                renderAllUI();
+                appendTerminalLog('RR Boot berjalan dalam SPOT SIMULATION MODE (Grid DCA TP).', 'warning');
+                appendTerminalLog('Buka tab "VPS & Spot API" untuk menghubungkan ke VPS Windows Anda.', 'info');
+            }
+
+            // Sinkronisasi VPS tiap 5 detik atau Simulasi Spot Grid DCA TP lokal
+            setInterval(() => {
+                if (vpsConfig.connected) {
+                    syncDataFromVPS(false);
+                } else {
+                    runLocalSpotDcaSimulation(false);
+                }
+            }, 5000);
+
+            // Live BTC Spot Price Ticker
+            setInterval(() => {
+                const delta = (Math.random() - 0.48) * 60;
+                appState.btcPrice = Math.max(45000, appState.btcPrice + delta);
+                const el = document.getElementById('live-btc-ticker');
+                if (el) el.textContent = `$${appState.btcPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }, 2500);
+        };
+
+        // --- 4. REST API BRIDGE KE BACK-END VPS ---
+        async function fetchVPS(endpoint, options = {}) {
+            if (!vpsConfig.url) throw new Error('URL Server VPS belum diisi.');
+            const cleanUrl = vpsConfig.url.replace(/\/+$/, '');
+            const headers = {
+                'Content-Type': 'application/json',
+                'x-dashboard-pin': vpsConfig.pin || '',
+                ...(options.headers || {})
+            };
+
+            const response = await fetch(`${cleanUrl}${endpoint}`, {
+                ...options,
+                headers
+            });
+
+            const data = await response.json();
+            if (!response.ok || data.success === false) {
+                throw new Error(data.message || `HTTP Error ${response.status}`);
+            }
+            return data;
+        }
+
+        async function connectToVPS() {
+            const urlInput = document.getElementById('vps-url-input').value.trim();
+            const pinInput = document.getElementById('vps-pin-input').value.trim();
+
+            if (!urlInput) {
+                showToast('Masukkan URL Server VPS atau Cloudflare Tunnel terlebih dahulu!', 'warning');
+                return;
+            }
+
+            const btn = document.getElementById('btn-connect-vps');
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Menghubungkan...`;
+            lucide.createIcons();
+
+            vpsConfig.url = urlInput;
+            vpsConfig.pin = pinInput;
+
+            try {
+                await syncDataFromVPS(true);
+                vpsConfig.connected = true;
+                saveVpsConfig();
+                updateConnectionModeUI();
+                showToast('Berhasil terhubung ke Back-End VPS RR Boot (Spot)!', 'success');
+            } catch (err) {
+                vpsConfig.connected = false;
+                saveVpsConfig();
+                updateConnectionModeUI();
+                showToast(`Gagal terhubung ke VPS: ${err.message}`, 'error');
+                appendTerminalLog(`[VPS ERROR] ${err.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i data-lucide="plug" class="w-4 h-4"></i> Hubungkan ke VPS`;
+                lucide.createIcons();
+            }
+        }
+
+        function disconnectVPS() {
+            vpsConfig.connected = false;
+            saveVpsConfig();
+            updateConnectionModeUI();
+            renderAllUI();
+            showToast('Koneksi VPS diputuskan. Kembali ke Spot Simulation Mode.', 'info');
+            appendTerminalLog('Kembali ke SPOT SIMULATION MODE (Grid DCA TP).', 'warning');
+        }
+
+        async function syncDataFromVPS(isInitial = false) {
+            const statusData = await fetchVPS('/api/status');
+
+            appState.masterRunning = statusData.config.master_active === 1;
+            appState.strategies = (statusData.strategies || []).map(s => ({
+                ...s,
+                strategy_type: 'Grid DCA TP',
+                max_layers: Number(s.max_layers || 4),
+                dca_multiplier: Number(s.dca_multiplier || 1.5),
+                sl_percent: Number(s.sl_percent || 1.0),
+                tp_percent: Number(s.tp_percent || 1.5)
+            }));
+            appState.history = statusData.history || [];
+            appState.totalProfit = Number(statusData.stats?.total_pnl || 0);
+            appState.totalTrades = Number(statusData.stats?.total_trades || 0);
+            appState.wins = Number(statusData.stats?.win_trades || 0);
+
+            if (statusData.config.has_api_key) {
+                try {
+                    const balData = await fetchVPS('/api/balance');
+                    if (balData.usdt) {
+                        appState.balanceUSDT = Number(balData.usdt.total || 0);
+                        appState.freeBalanceUSDT = Number(balData.usdt.free || 0);
+                    }
+                } catch (balErr) {
+                    if (isInitial) appendTerminalLog(`[SPOT API] Saldo belum terbaca: ${balErr.message}`, 'warning');
+                }
+            }
+
+            if (statusData.logs && statusData.logs.length > 0) {
+                const terminal = document.getElementById('bot-terminal');
+                terminal.innerHTML = '';
+                const orderedLogs = [...statusData.logs].reverse();
+                orderedLogs.forEach(log => {
+                    const timeStr = new Date(log.created_at).toLocaleTimeString('id-ID', { hour12: false });
+                    let type = 'info';
+                    if (log.level === 'SUCCESS' || log.level === 'TRADE') type = 'success';
+                    if (log.level === 'WARN') type = 'warning';
+                    if (log.level === 'ERROR') type = 'error';
+                    appendTerminalLineRaw(timeStr, `[${log.level}] ${log.message}`, type);
+                });
+            }
+
+            renderAllUI();
+        }
+
+        function updateConnectionModeUI() {
+            const badge = document.getElementById('vps-status-badge');
+            const dot = document.getElementById('vps-status-dot');
+            const text = document.getElementById('vps-status-text');
+            const sidebarDot = document.getElementById('sidebar-vps-dot');
+            const sidebarMode = document.getElementById('sidebar-mode-text');
+            const panelStatus = document.getElementById('vps-panel-status');
+            const dataSourceLabel = document.getElementById('kpi-data-source');
+            const termLabel = document.getElementById('terminal-source-label');
+            const termBtnText = document.getElementById('terminal-action-text');
+
+            if (vpsConfig.connected) {
+                badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold hover:bg-emerald-500/25 transition';
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-400 status-dot-active';
+                text.textContent = 'LIVE VPS SPOT';
+
+                sidebarDot.className = 'ml-auto w-2 h-2 rounded-full bg-emerald-400';
+                sidebarMode.className = 'text-emerald-400 font-mono font-semibold';
+                sidebarMode.textContent = 'VPS SPOT LIVE';
+
+                panelStatus.className = 'text-xs font-mono font-bold text-emerald-400 truncate';
+                panelStatus.textContent = `TERHUBUNG (${vpsConfig.url})`;
+
+                dataSourceLabel.textContent = 'VPS Spot SQLite';
+                termLabel.textContent = 'Source: VPS Spot Logs';
+                termBtnText.textContent = 'Sync VPS';
+            } else {
+                badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold hover:bg-amber-500/25 transition';
+                dot.className = 'w-2 h-2 rounded-full bg-amber-400 status-dot-sim';
+                text.textContent = 'SIMULATION MODE';
+
+                sidebarDot.className = 'ml-auto w-2 h-2 rounded-full bg-amber-400';
+                sidebarMode.className = 'text-amber-400 font-mono font-semibold';
+                sidebarMode.textContent = 'SIMULATION';
+
+                panelStatus.className = 'text-xs font-mono font-bold text-amber-400 truncate';
+                panelStatus.textContent = 'SIMULATION MODE (Spot Lokal)';
+
+                dataSourceLabel.textContent = 'Local Spot Sim';
+                termLabel.textContent = 'Mode: Simulasi Spot Lokal';
+                termBtnText.textContent = 'Simulasi DCA/TP';
+            }
+        }
+
+        // --- 5. SPOT API KEY SUBMISSION ---
+        async function saveAndTestApiKey(e) {
+            e.preventDefault();
+            const payload = {
+                exchange: document.getElementById('api-exchange').value,
+                market_type: 'spot',
+                is_testnet: document.getElementById('api-is-testnet').value === 'true',
+                api_key: document.getElementById('api-key-input').value.trim(),
+                api_secret: document.getElementById('api-secret-input').value.trim()
+            };
+
+            const btn = document.getElementById('btn-save-api');
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Menguji Koneksi Spot API...`;
+            lucide.createIcons();
+
+            try {
+                if (vpsConfig.connected) {
+                    const res = await fetchVPS('/api/settings/api', {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                    showToast(`${res.message} Saldo Spot USDT: $${Number(res.usdt_balance || 0).toFixed(2)}`, 'success');
+                    await syncDataFromVPS(false);
+                } else {
+                    await new Promise(r => setTimeout(r, 600));
+                    if (payload.api_key.length < 8 || payload.api_secret.length < 8) {
+                        throw new Error('Spot API Key atau Secret Key terlalu pendek.');
+                    }
+                    showToast(`[Simulasi] Spot API ${payload.exchange.toUpperCase()} (${payload.is_testnet ? 'Testnet' : 'Mainnet'}) tervalidasi!`, 'success');
+                    appendTerminalLog(`[SIM SPOT API] Kredensial ${payload.exchange.toUpperCase()} (SPOT) tersimpan lokal.`, 'success');
+                }
+            } catch (err) {
+                showToast(err.message, 'error');
+                appendTerminalLog(`[SPOT API ERROR] ${err.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i data-lucide="shield-check" class="w-4 h-4"></i> Simpan & Tes Koneksi Spot API`;
+                lucide.createIcons();
+            }
+        }
+
+        // --- 6. MASTER BOT & PANIC SELL SPOT ---
+        async function toggleMasterBot() {
+            const targetState = !appState.masterRunning;
+            try {
+                if (vpsConfig.connected) {
+                    await fetchVPS('/api/master-toggle', {
+                        method: 'POST',
+                        body: JSON.stringify({ active: targetState })
+                    });
+                    await syncDataFromVPS(false);
+                } else {
+                    appState.masterRunning = targetState;
+                    saveLocalState();
+                    updateMasterBotUI();
+                    appendTerminalLog(targetState ? '[SYSTEM] RR Boot Spot Master Engine STARTED.' : '[SYSTEM] RR Boot Spot Master Engine PAUSED.', targetState ? 'success' : 'warning');
+                }
+                showToast(targetState ? 'RR Boot Spot Engine DIAKTIFKAN!' : 'RR Boot Spot Engine DIJEDA!', targetState ? 'success' : 'warning');
+            } catch (err) {
+                showToast(`Gagal mengubah status Master Bot: ${err.message}`, 'error');
+            }
+        }
+
+        function updateMasterBotUI() {
+            const badge = document.getElementById('master-status-badge');
+            const dot = document.getElementById('master-status-dot');
+            const text = document.getElementById('master-status-text');
+            const btn = document.getElementById('master-toggle-btn');
+            const btnIcon = document.getElementById('master-toggle-icon');
+            const btnText = document.getElementById('master-toggle-text');
+
+            if (appState.masterRunning) {
+                badge.className = 'hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold';
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-400 status-dot-active';
+                text.textContent = 'RUNNING';
+
+                btn.className = 'px-3 py-1.5 sm:py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-semibold transition flex items-center gap-1.5';
+                btnIcon.setAttribute('data-lucide', 'pause');
+                btnText.textContent = 'Pause All';
+            } else {
+                badge.className = 'hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-400 text-xs font-semibold';
+                dot.className = 'w-2 h-2 rounded-full bg-slate-500';
+                text.textContent = 'PAUSED';
+
+                btn.className = 'px-3 py-1.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/20 transition flex items-center gap-1.5';
+                btnIcon.setAttribute('data-lucide', 'play');
+                btnText.textContent = 'Start All';
+            }
+            lucide.createIcons();
+        }
+
+        function triggerPanicSell() {
+            openConfirmModal(
+                'EMERGENCY PANIC SELL (SPOT)',
+                'Tindakan ini akan menjual seluruh aset kripto Spot aktif ke USDT dan menghentikan semua strategi Grid DCA TP. Lanjutkan?',
+                async () => {
+                    try {
+                        if (vpsConfig.connected) {
+                            await fetchVPS('/api/panic-sell', { method: 'POST' });
+                            await syncDataFromVPS(false);
+                        } else {
+                            appState.masterRunning = false;
+                            appState.strategies.forEach(s => {
+                                s.is_active = 0;
+                                s.current_layer = 0;
+                                s.avg_entry = 0;
+                            });
+                            saveLocalState();
+                            renderAllUI();
+                            appendTerminalLog('[PANIC SELL SPOT] Seluruh aset Spot dijual ke USDT & bot dihentikan.', 'error');
+                        }
+                        showToast('PANIC SELL SPOT SELESAI: Bot dihentikan.', 'error');
+                    } catch (err) {
+                        showToast(`Panic Sell Error: ${err.message}`, 'error');
+                    }
+                }
+            );
+        }
+
+        // --- 7. RENDER KPI & STRATEGIES (MAX LAYERS + DCA MULTIPLIER) ---
+        function renderAllUI() {
+            updateMasterBotUI();
+            updateKPIs();
+            renderStrategies();
+            renderHistoryTable();
+            if (profitChartInstance) {
+                const ds = profitChartInstance.data.datasets[0].data;
+                ds[ds.length - 1] = appState.balanceUSDT;
+                profitChartInstance.update('none');
+            }
+            lucide.createIcons();
+        }
+
+        function updateKPIs() {
+            const idrRate = 16250;
+            const totalIDR = appState.balanceUSDT * idrRate;
+            const allocatedCapital = appState.strategies.filter(s => s.is_active === 1).reduce((sum, s) => sum + Number(s.capital || 0), 0);
+            const freeMargin = vpsConfig.connected ? appState.freeBalanceUSDT : Math.max(0, appState.balanceUSDT - allocatedCapital);
+
+            document.getElementById('kpi-balance-usdt').textContent = `$${appState.balanceUSDT.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            document.getElementById('kpi-balance-idr').textContent = `≈ Rp ${Math.round(totalIDR).toLocaleString('id-ID')}`;
+            document.getElementById('kpi-free-margin').textContent = `$${freeMargin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+            const signTotal = appState.totalProfit >= 0 ? '+' : '';
+            document.getElementById('kpi-total-profit').textContent = `${signTotal}$${appState.totalProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            const baseCap = Math.max(1, appState.balanceUSDT - appState.totalProfit);
+            const roiPct = ((appState.totalProfit / baseCap) * 100).toFixed(2);
+            document.getElementById('kpi-roi-pct').innerHTML = `<i data-lucide="trending-up" class="w-3.5 h-3.5"></i> ${signTotal}${roiPct}% Spot ROI`;
+
+            const winRate = appState.totalTrades > 0 ? ((appState.wins / appState.totalTrades) * 100).toFixed(1) : '100.0';
+            document.getElementById('kpi-winrate').textContent = `${winRate}%`;
+            document.getElementById('kpi-trade-counts').textContent = `${appState.wins} TP / ${appState.totalTrades} Siklus`;
+
+            const activeCount = appState.strategies.filter(s => s.is_active === 1).length;
+            const totalCount = appState.strategies.length;
+            document.getElementById('kpi-active-bots').innerHTML = `${activeCount} <span class="text-base font-normal text-slate-400">/ ${totalCount} Bot</span>`;
+            document.getElementById('kpi-allocated-cap').textContent = `Modal Spot: $${allocatedCapital.toLocaleString()} USDT`;
+            document.getElementById('sidebar-bot-count').textContent = `${activeCount}/${totalCount}`;
+        }
+
+        function renderStrategies() {
+            const dashGrid = document.getElementById('dashboard-strategies-grid');
+            const tbody = document.getElementById('strategies-table-body');
+            dashGrid.innerHTML = '';
+            tbody.innerHTML = '';
+
+            if (appState.strategies.length === 0) {
+                dashGrid.innerHTML = `<div class="col-span-full text-center py-6 text-xs text-slate-500">Belum ada strategi Spot Grid DCA TP. Klik "Tambah Strategi" untuk membuat.</div>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-500">Belum ada strategi Spot Grid DCA TP yang dibuat.</td></tr>`;
+                return;
+            }
+
+            appState.strategies.forEach(bot => {
+                const isActive = bot.is_active === 1;
+                const maxLayers = Number(bot.max_layers || 4);
+                const mult = Number(bot.dca_multiplier || 1.5);
+                const slPct = Number(bot.sl_percent || 1.0);
+                const tpPct = Number(bot.tp_percent || 1.5);
+                const curLayer = Number(bot.current_layer || 0);
+
+                // Card di Dashboard Utama (Menampilkan Max Layers & DCA Multiplier)
+                dashGrid.innerHTML += `
+                    <div class="glass-card rounded-xl p-4 flex flex-col justify-between gap-3 ${!isActive ? 'opacity-60' : ''}">
+                        <div>
+                            <div class="flex items-center justify-between gap-2 mb-1.5">
+                                <span class="text-sm font-bold truncate">${bot.name}</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" ${isActive ? 'checked' : ''} onchange="toggleStrategy(${bot.id})" class="sr-only peer">
+                                    <div class="w-8 h-4 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500"></div>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center flex-wrap gap-2 text-xs font-mono text-slate-400 mb-2.5">
+                                <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold">${bot.pair}</span>
+                                <span>•</span>
+                                <span>Modal: <strong class="text-slate-200 dark:text-slate-200 text-slate-800">$${Number(bot.capital).toLocaleString()}</strong></span>
+                                <span>•</span>
+                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">SPOT</span>
+                            </div>
+
+                            <!-- Badge Max Layers & DCA Multiplier -->
+                            <div class="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                                <div class="px-2.5 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-between">
+                                    <span class="text-slate-400">Max Layers</span>
+                                    <span class="text-cyan-400 font-bold">${curLayer}/${maxLayers}</span>
+                                </div>
+                                <div class="px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
+                                    <span class="text-slate-400">DCA Mult.</span>
+                                    <span class="text-amber-400 font-bold">${mult.toFixed(1)}x</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-2.5 border-t border-slate-800/70 dark:border-slate-800/70 border-slate-200 flex items-center justify-between text-[11px]">
+                            <span class="text-emerald-400 font-mono font-semibold">Grid DCA TP</span>
+                            <span class="font-mono">
+                                <span class="text-rose-400">Drop -${slPct}%</span> / <span class="text-emerald-400">TP +${tpPct}%</span>
+                            </span>
+                        </div>
+                    </div>
+                `;
+
+                // Baris Tabel di Tab Grid DCA Strategi
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-800/40 dark:hover:bg-slate-800/40 hover:bg-slate-100/70 transition ${!isActive ? 'opacity-65' : ''}">
+                        <td class="py-3.5 px-4 font-sans font-semibold">${bot.name}</td>
+                        <td class="py-3.5 px-4 text-emerald-400 font-bold">${bot.pair}</td>
+                        <td class="py-3.5 px-4">$${Number(bot.capital).toLocaleString()}</td>
+                        <td class="py-3.5 px-4 text-cyan-400 font-bold">${maxLayers} Layers</td>
+                        <td class="py-3.5 px-4 text-amber-400 font-bold">${mult.toFixed(1)}x</td>
+                        <td class="py-3.5 px-4">
+                            <span class="text-rose-400">-${slPct}%</span> / <span class="text-emerald-400">+${tpPct}%</span>
+                        </td>
+                        <td class="py-3.5 px-4 text-center">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" ${isActive ? 'checked' : ''} onchange="toggleStrategy(${bot.id})" class="sr-only peer">
+                                <div class="w-9 h-5 bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                            </label>
+                        </td>
+                        <td class="py-3.5 px-4 text-right space-x-1">
+                            <button type="button" onclick="editStrategy(${bot.id})" class="p-2 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 transition" title="Edit Strategi">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                            <button type="button" onclick="deleteStrategy(${bot.id})" class="p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition" title="Hapus Strategi">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            lucide.createIcons();
+        }
+
+        // --- 8. STRATEGY MODAL (ADD & EDIT GRID DCA TP) ---
+        function updateDcaAllocationPreview() {
+            const capital = Math.max(10, Number(document.getElementById('strat-capital')?.value || 300));
+            const maxLayers = Math.max(1, Math.min(15, Number(document.getElementById('strat-max-layers')?.value || 4)));
+            const mult = Math.max(1.0, Number(document.getElementById('strat-multiplier')?.value || 1.5));
+
+            let weightSum = 0;
+            for (let i = 0; i <= maxLayers; i++) {
+                weightSum += Math.pow(mult, i);
+            }
+            const baseOrder = capital / Math.max(1, weightSum);
+
+            const baseEl = document.getElementById('preview-base-order');
+            const weightEl = document.getElementById('preview-weight-sum');
+            if (baseEl) baseEl.textContent = `$${baseOrder.toFixed(2)} USDT`;
+            if (weightEl) weightEl.textContent = `${weightSum.toFixed(2)}x`;
+        }
+
+        function openStrategyModal(editBot = null) {
+            document.getElementById('strategy-form').reset();
+            document.getElementById('strat-type').value = 'Grid DCA TP';
+
+            if (editBot) {
+                document.getElementById('strategy-modal-title').textContent = 'Edit Strategi Spot Grid DCA TP';
+                document.getElementById('strat-edit-id').value = editBot.id;
+                document.getElementById('strat-name').value = editBot.name;
+                document.getElementById('strat-pair').value = editBot.pair;
+                document.getElementById('strat-capital').value = editBot.capital;
+                document.getElementById('strat-max-layers').value = editBot.max_layers || 4;
+                document.getElementById('strat-multiplier').value = editBot.dca_multiplier || 1.5;
+                document.getElementById('strat-sl').value = editBot.sl_percent || 1.0;
+                document.getElementById('strat-tp').value = editBot.tp_percent || 1.5;
+                document.getElementById('strategy-submit-btn').innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> Perbarui Strategi`;
+            } else {
+                document.getElementById('strategy-modal-title').textContent = 'Tambah Strategi Spot Grid DCA TP';
+                document.getElementById('strat-edit-id').value = '';
+                document.getElementById('strategy-submit-btn').innerHTML = `<i data-lucide="check" class="w-4 h-4"></i> Simpan Strategi Spot`;
+            }
+
+            updateDcaAllocationPreview();
+            lucide.createIcons();
+            const modal = document.getElementById('strategy-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function editStrategy(id) {
+            const bot = appState.strategies.find(s => s.id === id);
+            if (bot) openStrategyModal(bot);
+        }
+
+        function closeStrategyModal() {
+            const modal = document.getElementById('strategy-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function saveStrategy(e) {
+            e.preventDefault();
+            const editId = document.getElementById('strat-edit-id').value;
+            const payload = {
+                name: document.getElementById('strat-name').value.trim(),
+                strategy_type: 'Grid DCA TP',
+                pair: document.getElementById('strat-pair').value,
+                capital: parseFloat(document.getElementById('strat-capital').value),
+                max_layers: parseInt(document.getElementById('strat-max-layers').value, 10),
+                dca_multiplier: parseFloat(document.getElementById('strat-multiplier').value),
+                sl_percent: parseFloat(document.getElementById('strat-sl').value),
+                tp_percent: parseFloat(document.getElementById('strat-tp').value)
+            };
+
+            try {
+                if (vpsConfig.connected) {
+                    if (editId) {
+                        // Jika di VPS sudah ada strategi lama, hapus & buat ulang atau panggil POST /api/strategies
+                        await fetchVPS(`/api/strategies/${editId}`, { method: 'DELETE' });
+                    }
+                    await fetchVPS('/api/strategies', {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                    await syncDataFromVPS(false);
+                } else {
+                    if (editId) {
+                        const idx = appState.strategies.findIndex(s => String(s.id) === String(editId));
+                        if (idx !== -1) {
+                            appState.strategies[idx] = { ...appState.strategies[idx], ...payload };
+                        }
+                        appendTerminalLog(`[GRID DCA] Strategi "${payload.name}" diperbarui (Layers: ${payload.max_layers}, Mult: ${payload.dca_multiplier}x).`, 'info');
+                    } else {
+                        appState.strategies.unshift({
+                            id: Date.now(),
+                            ...payload,
+                            current_layer: 0,
+                            avg_entry: 0,
+                            is_active: 1
+                        });
+                        appendTerminalLog(`[GRID DCA] Strategi baru "${payload.name}" (${payload.pair}) aktif di mode Spot.`, 'success');
+                    }
+                    saveLocalState();
+                    renderAllUI();
+                }
+
+                closeStrategyModal();
+                showToast(`Strategi Spot "${payload.name}" berhasil disimpan!`, 'success');
+            } catch (err) {
+                showToast(`Gagal menyimpan strategi: ${err.message}`, 'error');
+            }
+        }
+
+        async function toggleStrategy(id) {
+            try {
+                if (vpsConfig.connected) {
+                    await fetchVPS(`/api/strategies/${id}/toggle`, { method: 'PATCH' });
+                    await syncDataFromVPS(false);
+                } else {
+                    const bot = appState.strategies.find(s => s.id === id);
+                    if (bot) bot.is_active = bot.is_active === 1 ? 0 : 1;
+                    saveLocalState();
+                    renderAllUI();
+                }
+                showToast('Status strategi Spot diperbarui.', 'info');
+            } catch (err) {
+                showToast(`Gagal toggle strategi: ${err.message}`, 'error');
+            }
+        }
+
+        function deleteStrategy(id) {
+            openConfirmModal(
+                'Hapus Strategi Grid DCA TP',
+                'Apakah Anda yakin ingin menghapus strategi Spot ini dari RR Boot?',
+                async () => {
+                    try {
+                        if (vpsConfig.connected) {
+                            await fetchVPS(`/api/strategies/${id}`, { method: 'DELETE' });
+                            await syncDataFromVPS(false);
+                        } else {
+                            appState.strategies = appState.strategies.filter(s => s.id !== id);
+                            saveLocalState();
+                            renderAllUI();
+                        }
+                        showToast('Strategi berhasil dihapus.', 'info');
+                    } catch (err) {
+                        showToast(`Gagal menghapus strategi: ${err.message}`, 'error');
+                    }
+                }
+            );
+        }
+
+        // --- 9. RIWAYAT PROFIT & EXPORT CSV ---
+        function renderHistoryTable() {
+            const tbody = document.getElementById('full-history-tbody');
+            const search = (document.getElementById('history-search')?.value || '').toLowerCase();
+            const filterRes = document.getElementById('history-filter-result')?.value || 'ALL';
+
+            tbody.innerHTML = '';
+
+            const filtered = appState.history.filter(t => {
+                const pairStr = (t.pair || '').toLowerCase();
+                const stratStr = (t.strategy_name || '').toLowerCase();
+                const pnl = Number(t.pnl_usdt || 0);
+                const matchSearch = pairStr.includes(search) || stratStr.includes(search);
+                const matchRes =
+                    filterRes === 'ALL' ||
+                    (filterRes === 'PROFIT' && pnl > 0) ||
+                    (filterRes === 'LOSS' && pnl < 0);
+                return matchSearch && matchRes;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-500">Belum ada data riwayat transaksi Spot.</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(t => {
+                const pnl = Number(t.pnl_usdt || 0);
+                const sideText = t.side || 'BUY L0';
+                const isSellTp = sideText.includes('SELL') || sideText.includes('TP');
+                const sideBadge = isSellTp
+                    ? `<span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-semibold">${sideText}</span>`
+                    : `<span class="px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-400 font-semibold">${sideText}</span>`;
+
+                const pnlDisplay = pnl === 0
+                    ? `<span class="text-slate-400">$0.00</span>`
+                    : `<span class="font-bold ${pnl > 0 ? 'text-emerald-400' : 'text-rose-400'}">${pnl > 0 ? '+' : ''}$${pnl.toFixed(2)}</span>`;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-800/40 dark:hover:bg-slate-800/40 hover:bg-slate-100/70 transition">
+                        <td class="py-3.5 px-4 text-slate-400">${t.created_at}</td>
+                        <td class="py-3.5 px-4 text-emerald-400/90 uppercase">${t.exchange || 'Binance Spot'}</td>
+                        <td class="py-3.5 px-4 font-bold">${t.pair}</td>
+                        <td class="py-3.5 px-4">${sideBadge}</td>
+                        <td class="py-3.5 px-4 font-sans">${t.strategy_name}</td>
+                        <td class="py-3.5 px-4">$${Number(t.entry_price || 0).toLocaleString()}</td>
+                        <td class="py-3.5 px-4">${pnlDisplay}</td>
+                        <td class="py-3.5 px-4 text-right">
+                            <span class="px-2 py-0.5 rounded text-[10px] bg-slate-800/90 text-slate-300 border border-slate-700">${t.status || 'OPEN'}</span>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function exportHistoryCSV() {
+            let csv = 'Waktu,Exchange,Pair,Side_Layer,Strategi,Harga_Entry,Realized_PnL_USDT,Status\n';
+            appState.history.forEach(t => {
+                csv += `"${t.created_at}","${t.exchange || 'Binance Spot'}","${t.pair}","${t.side}","${t.strategy_name}",${t.entry_price},${Number(t.pnl_usdt || 0).toFixed(2)},"${t.status || 'OPEN'}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `RR_Boot_Spot_GridDCA_${new Date().toISOString().slice(0,10)}.csv`;
+            link.click();
+            showToast('File CSV riwayat Spot Grid DCA TP berhasil diunduh!', 'success');
+        }
+
+        // --- 10. CHART.JS EQUITY CURVE ---
+        function initChart() {
+            const ctx = document.getElementById('profitChart').getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+            gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+            const chartData = getChartDataByTimeframe(currentTimeframe);
+            const isDark = document.documentElement.classList.contains('dark');
+            const tickColor = isDark ? '#94a3b8' : '#475569';
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(15, 23, 42, 0.06)';
+
+            profitChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [{
+                        label: 'Saldo Spot (USDT)',
+                        data: chartData.values,
+                        borderColor: '#10B981',
+                        backgroundColor: gradient,
+                        borderWidth: 2.5,
+                        pointBackgroundColor: '#10B981',
+                        pointBorderColor: '#0f172a',
+                        pointBorderWidth: 2,
+                        pointRadius: 3,
+                        pointHoverRadius: 6,
+                        fill: true,
+                        tension: 0.38
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            bodyColor: '#10B981',
+                            bodyFont: { family: 'JetBrains Mono', weight: 'bold' },
+                            callbacks: {
+                                label: ctx => ` Spot Balance: $${ctx.parsed.y.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: gridColor },
+                            ticks: { color: tickColor, font: { family: 'JetBrains Mono', size: 11 } }
+                        },
+                        y: {
+                            grid: { color: gridColor },
+                            ticks: {
+                                color: tickColor,
+                                font: { family: 'JetBrains Mono', size: 11 },
+                                callback: v => '$' + Number(v).toLocaleString()
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChartThemeColors() {
+            if (!profitChartInstance) return;
+            const isDark = document.documentElement.classList.contains('dark');
+            const tickColor = isDark ? '#94a3b8' : '#475569';
+            const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(15, 23, 42, 0.06)';
+            profitChartInstance.options.scales.x.ticks.color = tickColor;
+            profitChartInstance.options.scales.y.ticks.color = tickColor;
+            profitChartInstance.options.scales.x.grid.color = gridColor;
+            profitChartInstance.options.scales.y.grid.color = gridColor;
+            profitChartInstance.update('none');
+        }
+
+        function getChartDataByTimeframe(tf) {
+            const cur = appState.balanceUSDT;
+            if (tf === '24H') return { labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', 'Now'], values: [cur - 95, cur - 78, cur - 84, cur - 52, cur - 31, cur - 12, cur] };
+            if (tf === '7D') return { labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'], values: [cur - 420, cur - 350, cur - 375, cur - 260, cur - 175, cur - 88, cur] };
+            if (tf === '30D') return { labels: ['W1', 'W2', 'W3', 'W4', 'Now'], values: [cur - 1250, cur - 910, cur - 610, cur - 290, cur] };
+            return { labels: ['Jul', 'Agu', 'Sep', 'Okt', 'Nov'], values: [10604.40, 11020.00, 11480.50, 11960.20, cur] };
+        }
+
+        function updateChartTimeframe(tf) {
+            currentTimeframe = tf;
+            document.querySelectorAll('.tf-btn').forEach(b => b.className = 'tf-btn px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-emerald-400 transition');
+            document.getElementById(`tf-${tf}`).className = 'tf-btn px-3 py-1 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 transition';
+            if (profitChartInstance) {
+                const d = getChartDataByTimeframe(tf);
+                profitChartInstance.data.labels = d.labels;
+                profitChartInstance.data.datasets[0].data = d.values;
+                profitChartInstance.update();
+            }
+        }
+
+        // --- 11. TERMINAL & LOCAL SPOT GRID DCA TP SIMULATION ---
+        function appendTerminalLineRaw(timeStr, message, type = 'info') {
+            const terminal = document.getElementById('bot-terminal');
+            if (!terminal) return;
+            let colorClass = 'text-slate-300 dark:text-slate-300 text-slate-700';
+            if (type === 'success') colorClass = 'text-emerald-400';
+            if (type === 'warning') colorClass = 'text-amber-400';
+            if (type === 'error') colorClass = 'text-rose-400';
+
+            const line = document.createElement('div');
+            line.className = 'leading-relaxed border-b border-slate-800/40 dark:border-slate-800/40 border-slate-200/70 pb-1';
+            line.innerHTML = `<span class="text-slate-500">[${timeStr}]</span> <span class="${colorClass}">${message}</span>`;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+            while (terminal.children.length > 45) terminal.removeChild(terminal.firstChild);
+        }
+
+        function appendTerminalLog(message, type = 'info') {
+            const now = new Date().toLocaleTimeString('id-ID', { hour12: false });
+            appendTerminalLineRaw(now, message, type);
+        }
+
+        function clearTerminalLogs() {
+            document.getElementById('bot-terminal').innerHTML = '';
+            appendTerminalLog('Log tampilan terminal Spot dibersihkan.', 'info');
+        }
+
+        async function forceRefreshOrSimulate() {
+            if (vpsConfig.connected) {
+                try {
+                    await syncDataFromVPS(false);
+                    showToast('Data VPS Spot berhasil disinkronkan!', 'success');
+                } catch (err) {
+                    showToast(`Sync gagal: ${err.message}`, 'error');
+                }
+            } else {
+                runLocalSpotDcaSimulation(true);
+            }
+        }
+
+        function runLocalSpotDcaSimulation(forceAction = false) {
+            if (vpsConfig.connected || !appState.masterRunning) return;
+            const activeBots = appState.strategies.filter(s => s.is_active === 1);
+            if (activeBots.length === 0) return;
+
+            const bot = activeBots[Math.floor(Math.random() * activeBots.length)];
+            const maxLayers = Number(bot.max_layers || 4);
+            const mult = Number(bot.dca_multiplier || 1.5);
+            const curLayer = Number(bot.current_layer || 0);
+            const price = bot.pair.includes('BTC') ? Number(appState.btcPrice.toFixed(2)) : Number((120 + Math.random() * 180).toFixed(2));
+
+            const now = new Date();
+            const timeFormatted = `${now.getDate()} Nov ${now.toLocaleTimeString('id-ID', { hour12: false })}`;
+
+            // Jika belum forceAction dan probabilitas scan biasa -> tampilkan scan grid DCA
+            if (!forceAction && Math.random() < 0.65) {
+                appendTerminalLog(`[GRID DCA SCAN] ${bot.pair} (${bot.name}) @ $${price} | Layer ${curLayer}/${maxLayers} | Mult ${mult}x | TP +${bot.tp_percent}%`, 'info');
+                return;
+            }
+
+            // Jika sudah ada layer aktif & (forceAction atau random TP), jual seluruh posisi Spot & realisasikan TP!
+            if (curLayer > 0 && (forceAction || Math.random() < 0.55)) {
+                const pnl = Number((bot.capital * 0.25 * (Number(bot.tp_percent || 1.5) / 100) * (1 + curLayer * 0.15)).toFixed(2));
+                appState.balanceUSDT = Number((appState.balanceUSDT + pnl).toFixed(2));
+                appState.totalProfit = Number((appState.totalProfit + pnl).toFixed(2));
+                appState.totalTrades += 1;
+                appState.wins += 1;
+
+                bot.current_layer = 0;
+                bot.avg_entry = 0;
+
+                appState.history.unshift({
+                    id: Date.now(),
+                    created_at: timeFormatted,
+                    exchange: appState.activeExchange,
+                    pair: bot.pair,
+                    side: 'SELL TP',
+                    strategy_name: bot.name,
+                    entry_price: price,
+                    pnl_usdt: pnl,
+                    status: 'TP_SOLD'
+                });
+                if (appState.history.length > 50) appState.history.pop();
+
+                saveLocalState();
+                renderAllUI();
+                appendTerminalLog(`[TP SOLD] ${bot.name} menutup seluruh Spot ${bot.pair} @ $${price} | Profit: +$${pnl.toFixed(2)}`, 'success');
+                showToast(`Spot TP Tercapai (${bot.pair}): +$${pnl.toFixed(2)} USDT`, 'success');
+                return;
+            }
+
+            // Jika belum mencapai max_layers, lakukan pembelian Grid DCA layer berikutnya
+            if (curLayer < maxLayers) {
+                const nextLayer = curLayer + 1;
+                bot.current_layer = nextLayer;
+                bot.avg_entry = price;
+
+                appState.history.unshift({
+                    id: Date.now(),
+                    created_at: timeFormatted,
+                    exchange: appState.activeExchange,
+                    pair: bot.pair,
+                    side: `BUY L${nextLayer}`,
+                    strategy_name: bot.name,
+                    entry_price: price,
+                    pnl_usdt: 0,
+                    status: 'OPEN'
+                });
+                if (appState.history.length > 50) appState.history.pop();
+
+                saveLocalState();
+                renderAllUI();
+                appendTerminalLog(`[DCA BUY L${nextLayer}/${maxLayers}] ${bot.name} membeli Spot ${bot.pair} @ $${price} (Mult ${mult}x)`, 'warning');
+            }
+        }
+
+        // --- 12. NAVIGATION & HELPERS ---
+        function updateClock() {
+            const now = new Date().toLocaleTimeString('id-ID', { hour12: false });
+            const el = document.getElementById('realtime-clock');
+            if (el) el.textContent = `${now} WIB`;
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-emerald-500/15', 'text-emerald-400', 'border', 'border-emerald-500/20');
+                btn.classList.add('text-slate-400');
+            });
+            const activeNav = document.getElementById(`nav-${tabName}`);
+            if (activeNav) {
+                activeNav.classList.remove('text-slate-400');
+                activeNav.classList.add('bg-emerald-500/15', 'text-emerald-400', 'border', 'border-emerald-500/20');
+            }
+
+            document.querySelectorAll('.mob-nav-btn').forEach(btn => {
+                btn.classList.remove('text-emerald-400');
+                btn.classList.add('text-slate-400');
+            });
+            const activeMob = document.getElementById(`mob-nav-${tabName}`);
+            if (activeMob) {
+                activeMob.classList.remove('text-slate-400');
+                activeMob.classList.add('text-emerald-400');
+            }
+        }
+
+        function changeActiveExchange() {
+            appState.activeExchange = document.getElementById('header-exchange-select').value;
+            saveLocalState();
+            showToast(`Spot Exchange aktif diubah ke ${appState.activeExchange}`, 'info');
+        }
+
+        function toggleInputVisibility(id) {
+            const el = document.getElementById(id);
+            el.type = el.type === 'password' ? 'text' : 'password';
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const styles = {
+                success: 'bg-slate-900/95 border-emerald-500/50 text-emerald-300',
+                error: 'bg-slate-900/95 border-rose-500/50 text-rose-300',
+                warning: 'bg-slate-900/95 border-amber-500/50 text-amber-300',
+                info: 'bg-slate-900/95 border-cyan-500/50 text-cyan-300'
+            };
+            toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-xl backdrop-blur-md text-xs sm:text-sm font-medium transition-all duration-300 ${styles[type] || styles.info}`;
+            toast.innerHTML = `<span class="flex-1">${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        let confirmCallback = null;
+        function openConfirmModal(title, message, onYes) {
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+            confirmCallback = onYes;
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            confirmCallback = null;
+        }
+
+        document.getElementById('confirm-yes-btn').addEventListener('click', () => {
+            if (confirmCallback) confirmCallback();
+            closeConfirmModal();
+        });
+    </script>
+</body>
+</html>
